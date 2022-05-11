@@ -65,7 +65,7 @@ int main() {
 	
 	// prepare controller2
 	const string ee_link_name = "link7";
-	const Vector3d pos_in_ee_link = Vector3d(0, 0, 0.15);
+	const Vector3d pos_in_ee_link = Vector3d(0, 0, 0.1654);
 	VectorXd g = VectorXd::Zero(dof);
 	VectorXd b = VectorXd::Zero(dof);
 
@@ -111,7 +111,7 @@ int main() {
 	joint_task->_kv = 20.0;
 
 	VectorXd q_init_desired(dof);
-	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0;
+	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0, 0.02*180/M_PI, -0.02*180/M_PI;
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
 
@@ -206,10 +206,10 @@ int main() {
 			
 			
 			x_d << _object_pos;
-			cout << "Position: " << _object_pos << endl;
+			//cout << "Position: " << _object_pos << endl;
 
-			VectorXd q_desired = VectorXd::Zero(dof);
-			q_desired << 0, 0, 0, 0, 0, 0, 0;
+			VectorXd q_desired = q_init_desired;
+			//q_desired << 0, 0, 0, 0, 0, 0, 0;
 
 			robot->gravityVector(g);
 

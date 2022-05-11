@@ -86,19 +86,23 @@ int main() {
 	Eigen::Vector3d camera_pos, camera_lookat, camera_vertical;
 	graphics->getCameraPose(camera_name, camera_pos, camera_vertical, camera_lookat);
 	graphics->_world->setBackgroundColor(66.0/255, 135.0/255, 245.0/255);  // set blue background 	
-	graphics->showLinkFrame(true, robot_name, ee_link_name, 0.15);  // can add frames for different links
+	//graphics->showLinkFrame(true, robot_name, ee_link_name, 0.15);  // can add frames for different links
 	graphics->getCamera(camera_name)->setClippingPlanes(0.1, 50);  // set the near and far clipping planes 
 
 	// load robots
 	auto robot = new Sai2Model::Sai2Model(robot_file, false);
-	robot->_q = VectorXd::Zero(7);
-	robot->_dq = VectorXd::Zero(7);
-	robot->updateModel();
+	robot->updateKinematics();
+	//robot->_q = VectorXd::Zero(9);
+	//robot->_dq = VectorXd::Zero(9);
+	//robot->updateModel();
 
 	// load simulation world
 	auto sim = new Simulation::Sai2Simulation(world_file, false);
-	sim->setJointPositions(robot_name, robot->_q);
-	sim->setJointVelocities(robot_name, robot->_dq);
+	//sim->setJointPositions(robot_name, robot->_q);
+	//sim->setJointVelocities(robot_name, robot->_dq);
+	sim->getJointPositions(robot_name, robot->_q);
+	sim->getJointVelocities(robot_name, robot->_dq);
+	robot->updateKinematics();
 
 	// fill in object information 
 	for (int i = 0; i < n_objects; ++i) {
@@ -110,7 +114,7 @@ int main() {
 		object_lin_vel.push_back(_object_lin_vel);
 		object_ori.push_back(_object_ori);
 		object_ang_vel.push_back(_object_ang_vel);
-		cout << "Position: " << _object_pos << endl;
+		//cout << "Position: " << _object_pos << endl;
 	}
 
     // set co-efficient of restition to zero for force control
@@ -134,8 +138,8 @@ int main() {
 	// information about computer screen and GLUT display window
 	int screenW = mode->width;
 	int screenH = mode->height;
-	int windowW = 0.8 * screenH;
-	int windowH = 0.5 * screenH;
+	int windowW = 0.8 * screenW;
+	int windowH = 0.8 * screenH;
 	int windowPosY = (screenH - windowH) / 2;
 	int windowPosX = windowPosY;
 
@@ -169,6 +173,8 @@ int main() {
 	int count = 0;
 	Vector3d start_pos = Vector3d(1, -1, 1);
 
+	fSimulationRunning = true;
+
 	while (!glfwWindowShouldClose(window) && fSimulationRunning)
 	{
 		// add sphere for every nth count
@@ -184,9 +190,9 @@ int main() {
 		graphics->updateGraphics(robot_name, robot); 
 		for (int i = 0; i < n_objects; ++i) {
 			//object_pos.push_back(object_pos[i] + Delta);
-			sim->setObjectPosition(object_names[0], object_pos[0]+Delta, object_ori[0]);
+			sim->setObjectPosition(object_names[i], object_pos[i]+Delta, object_ori[i]);
 			graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
-			cout << "Position: " << object_pos[0] << endl;
+			//cout << "Velocity: " << object_lin_vel[i] << endl;
 		}
 		graphics->render(camera_name, width, height);
 

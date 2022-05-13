@@ -68,6 +68,8 @@ bool fRotPanTilt = false;
 bool fRobotLinkSelect = false;
 
 Vector3d Delta = Vector3d(0.0, 0.0, 0.01);
+Vector3d object_final;
+Vector3d haptic_pos;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -190,10 +192,19 @@ int main() {
 		graphics->updateGraphics(robot_name, robot); 
 		for (int i = 0; i < n_objects; ++i) {
 			//object_pos.push_back(object_pos[i] + Delta);
-			sim->setObjectPosition(object_names[i], object_pos[i]+Delta, object_ori[i]);
+			//Matrix3d R;
+			//R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
+			//object_pos[i] = R*object_pos[i];
+			//object_pos[i](2) = 0;
+			//object_pos[i] = object_pos[i]*10;
+			//sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
 			//cout << "Velocity: " << object_lin_vel[i] << endl;
 		}
+
+		object_final = object_pos[0]; //Update key to send to controller
+		
+		
 		graphics->render(camera_name, width, height);
 
 		// swap buffers
@@ -302,11 +313,13 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	// add to read callback
 	redis_client.addStringToReadCallback(0, CONTROLLER_RUNNING_KEY, controller_status);
 	redis_client.addEigenToReadCallback(0, JOINT_TORQUES_COMMANDED_KEY, command_torques);
+	redis_client.addEigenToReadCallback(0, HAPTIC_POS_KEY, haptic_pos);
 
 	// add to write callback
 	redis_client.addEigenToWriteCallback(0, JOINT_ANGLES_KEY, robot->_q);
 	redis_client.addEigenToWriteCallback(0, JOINT_VELOCITIES_KEY, robot->_dq);
-	redis_client.addEigenToWriteCallback(0, OBJECT_POS_KEY, object_pos[0]);
+	redis_client.addEigenToWriteCallback(0, OBJECT_POS_KEY, object_final);
+
 
 	// create a timer
 	LoopTimer timer;
@@ -343,11 +356,25 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 		sim->getJointPositions(robot_name, robot->_q);
 		sim->getJointVelocities(robot_name, robot->_dq);
 		robot->updateModel();
-
+		
+		
+		
+		
 		// get dynamic object positions
 		for (int i = 0; i < n_objects; ++i) {
-			sim->getObjectPosition(object_names[i], object_pos[i], object_ori[i]);
-			sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
+			//sim->getObjectPosition(object_names[i], object_pos[i], object_ori[i]);
+			//sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
+			//object_pos[i](2) = 0;
+			//object_pos[i] = object_pos[i]*10;
+
+			Matrix3d R;
+			R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
+			haptic_pos = R*haptic_pos;
+			haptic_pos(2) = 0;
+			haptic_pos = haptic_pos*10;
+			object_pos[i] = haptic_pos;
+			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
+			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
 		}
 
 		// execute redis write callback

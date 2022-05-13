@@ -204,7 +204,6 @@ int main() {
 			robot->taskInertiaMatrix(Lambda, Jv);
 			robot->nullspaceMatrix(N, Jv);
 			
-			
 			x_d << _object_pos;
 			//cout << "Position: " << _object_pos << endl;
 

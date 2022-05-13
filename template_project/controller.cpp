@@ -37,6 +37,16 @@ enum State
 	MOTION
 };
 
+// helper function 
+double sat(double x) {
+	if (abs(x) <= 1.0) {
+		return x;
+	}
+	else {
+		return signbit(x);
+	}
+}
+
 int main() {
 
 	// initial state 	redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q); 
@@ -190,13 +200,15 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 			command_torques = posori_task_torques + joint_task_torques;
 			*/
-			Vector3d x, x_d, dx, F;
+			Vector3d x, x_d, dx_d, dx, F;
 			VectorXd g(dof), joint_task_torque(dof);
 
-			double kp = 100;
+			double kp = 200;
 			double kv = 20;
 			double kpj = 50;
 			double kvj = 14;
+
+			double Vmax = 0.1;
 			
 			robot->position(x, ee_link_name, pos_in_ee_link);
 			robot->linearVelocity(dx, ee_link_name, pos_in_ee_link);
@@ -207,12 +219,21 @@ int main() {
 			x_d << _object_pos;
 			//cout << "Position: " << _object_pos << endl;
 
+			dx_d = kp / kv * (x_d - x);
+			double nu = sat(Vmax / dx_d.norm());
+
+			//F = Lambda * (-kv * (dx + nu*dx_d));
+			F = Lambda * (-kv * (dx + dx_d));
+
 			VectorXd q_desired = q_init_desired;
 			//q_desired << 0, 0, 0, 0, 0, 0, 0;
 
+			joint_task_torque = -kpj*(robot->_q - q_desired) - kvj * robot->_dq;
+
 			robot->gravityVector(g);
 
-			command_torques = Jv.transpose()*(Lambda*(-kp*(x - x_d) - kv*dx)) + N.transpose()*(-kpj*(robot->_q - q_desired) - kvj*robot->_dq) + g;
+			cout << nu << endl;
+			command_torques = Jv.transpose()*F + N.transpose()*joint_task_torque + g;
 
 			
 		}

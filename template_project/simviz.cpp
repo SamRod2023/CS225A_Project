@@ -331,6 +331,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 
 	// start simulation 
 	fSimulationRunning = true;	
+	object_pos[0](2) = 0;
 	while (fSimulationRunning) {
 		fTimerDidSleep = timer.waitForNextLoop();
 
@@ -371,8 +372,8 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
 			haptic_pos = R*haptic_pos;
 			haptic_pos(2) = 0;
-			haptic_pos = haptic_pos*10;
-			object_pos[i] = haptic_pos;
+			//haptic_pos = haptic_pos*10;
+			object_pos[i] = object_pos[i] + haptic_pos*0.01;
 			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
 		}

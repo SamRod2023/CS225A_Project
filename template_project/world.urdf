@@ -35,9 +35,9 @@
       	</inertial>
 
 	    <visual>
-	        <origin xyz="0 0 0" rpy="0 0 0" />
+	        <origin xyz="0 0 0.125" rpy="1.57 0 0" />
 			<geometry>
-	            <mesh filename="../../model/test_objects/meshes/visual/cup.obj" />
+	            <mesh filename="../../model/test_objects/meshes/visual/mouse_by_dommk.obj" scale = "0.05 0.05 0.05"/>
 	        </geometry>
 	    </visual>
 

@@ -75,7 +75,7 @@ int main() {
 	
 	// prepare controller2
 	const string ee_link_name = "link7";
-	const Vector3d pos_in_ee_link = Vector3d(0, 0, 0.1654);
+	const Vector3d pos_in_ee_link = Vector3d(0, 0, 0.2);
 	VectorXd g = VectorXd::Zero(dof);
 	VectorXd b = VectorXd::Zero(dof);
 
@@ -205,10 +205,10 @@ int main() {
 
 			double kp = 200;
 			double kv = 20;
-			double kpj = 50;
-			double kvj = 14;
+			double kpj = 100;
+			double kvj = 30;
 
-			double Vmax = 0.1;
+			double Vmax = 0.75;
 			
 			robot->position(x, ee_link_name, pos_in_ee_link);
 			robot->linearVelocity(dx, ee_link_name, pos_in_ee_link);
@@ -217,24 +217,23 @@ int main() {
 			robot->nullspaceMatrix(N, Jv);
 			
 			x_d << _object_pos;
+			x_d(2) = 0.05;
 			//cout << "Position: " << _object_pos << endl;
 
 			dx_d = kp / kv * (x_d - x);
 			double nu = sat(Vmax / dx_d.norm());
 
-			//F = Lambda * (-kv * (dx + nu*dx_d));
-			F = Lambda * (-kv * (dx + dx_d));
+			F = Lambda * (-kv * (dx - nu * dx_d));
+			//F = Lambda * (-kv * (dx - dx_d));
 
 			VectorXd q_desired = q_init_desired;
-			//q_desired << 0, 0, 0, 0, 0, 0, 0;
+			//q_desired << 0, 0, 0, 0, 0, 0, 0, 0, 0;
 
 			joint_task_torque = -kpj*(robot->_q - q_desired) - kvj * robot->_dq;
 
 			robot->gravityVector(g);
 
-			cout << nu << endl;
-			command_torques = Jv.transpose()*F + N.transpose()*joint_task_torque + g;
-
+			command_torques = Jv.transpose() * F + N.transpose() * joint_task_torque + g;
 			
 		}
 

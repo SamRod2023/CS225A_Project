@@ -69,7 +69,7 @@ bool fRobotLinkSelect = false;
 
 Vector3d Delta = Vector3d(0.0, 0.0, 0.01);
 Vector3d object_final;
-Vector3d haptic_pos;
+Vector3d haptic_pos, haptic_force;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -314,6 +314,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	redis_client.addStringToReadCallback(0, CONTROLLER_RUNNING_KEY, controller_status);
 	redis_client.addEigenToReadCallback(0, JOINT_TORQUES_COMMANDED_KEY, command_torques);
 	redis_client.addEigenToReadCallback(0, HAPTIC_POS_KEY, haptic_pos);
+	redis_client.addEigenToWriteCallback(0, HAPTIC_FORCE_KEY, haptic_force);
 
 	// add to write callback
 	redis_client.addEigenToWriteCallback(0, JOINT_ANGLES_KEY, robot->_q);
@@ -367,13 +368,14 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			//sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
 			//object_pos[i](2) = 0;
 			//object_pos[i] = object_pos[i]*10;
+			haptic_force = -haptic_pos;
 
 			Matrix3d R;
 			R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
 			haptic_pos = R*haptic_pos;
 			haptic_pos(2) = 0;
 			//haptic_pos = haptic_pos*10;
-			object_pos[i] = object_pos[i] + haptic_pos*0.01;
+			object_pos[i] = object_pos[i] + haptic_pos*0.02;
 			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
 		}

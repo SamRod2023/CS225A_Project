@@ -11,6 +11,7 @@ const std::string CONTROLLER_RUNNING_KEY = "sai2::sim::panda::controller";
 
 const std::string OBJECT_POS_KEY = "sai2::sim::cup::actuator::pos";
 const std::string HAPTIC_POS_KEY = "sai2::ChaiHapticDevice::device0::sensors::current_position";
+const std::string HAPTIC_VEL_KEY = "sai2::ChaiHapticDevice::device0::sensors::current_trans_velocity";
 const std::string HAPTIC_FORCE_KEY = "sai2::ChaiHapticDevice::device0::actuators::commanded_force";
 
 

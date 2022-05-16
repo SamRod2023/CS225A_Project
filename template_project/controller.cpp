@@ -201,7 +201,9 @@ int main() {
 			command_torques = posori_task_torques + joint_task_torques;
 			*/
 			Vector3d x, x_d, dx_d, dx, F;
-			VectorXd g(dof), joint_task_torque(dof);
+			VectorXd g(dof), joint_task_torque(dof), q_low(dof), q_high(dof), Gamma_mid(dof), Gamma_damp(dof);
+			MatrixXd Gamma_Neutralizer = MatrixXd::Identity(dof,dof);
+			Gamma_Neutralizer(0,0) = 0.0;
 
 			double kp = 200;
 			double kv = 20;
@@ -215,6 +217,27 @@ int main() {
 			robot->Jv(Jv, ee_link_name, pos_in_ee_link);
 			robot->taskInertiaMatrix(Lambda, Jv);
 			robot->nullspaceMatrix(N, Jv);
+
+			q_low(0) = -2.8973;
+			q_low(1) = -1.7628;
+			q_low(2) = -2.8973;
+			q_low(3) = -3.0718;
+			q_low(4) = -2.8973;
+			q_low(5) = -0.0175;
+			q_low(6) = -2.8973;
+			q_low(7) = 0.0;
+			q_low(8) = 0.0;
+			// set q_high
+			q_high(0) = 2.8973;
+			q_high(1) = 1.7628;
+			q_high(2) = 2.8973;
+			q_high(3) = -0.0698;
+			q_high(4) = 2.8973;
+			q_high(5) = 3.7525;
+			q_high(6) = 2.8973;
+			q_high(7) = 0.04;
+			q_high(8) = 0.04;
+
 			
 			x_d << _object_pos;
 			x_d(2) = 0.05;
@@ -225,15 +248,19 @@ int main() {
 
 			F = Lambda * (-kv * (dx - nu * dx_d));
 			//F = Lambda * (-kv * (dx - dx_d));
+			Gamma_damp = -kvj * robot->_dq;
+
+			Gamma_mid = -2 * kpj * (robot->_q - (q_high + q_low) / 2);
+			Gamma_mid = Gamma_Neutralizer * Gamma_mid;
 
 			VectorXd q_desired = q_init_desired;
 			//q_desired << 0, 0, 0, 0, 0, 0, 0, 0, 0;
 
-			joint_task_torque = -kpj*(robot->_q - q_desired) - kvj * robot->_dq;
+			//joint_task_torque = -kpj*(robot->_q - q_desired) - kvj * robot->_dq;
 
 			robot->gravityVector(g);
 
-			command_torques = Jv.transpose() * F + N.transpose() * joint_task_torque + g;
+			command_torques = Jv.transpose() * F + (N.transpose() * Gamma_mid + N.transpose() * Gamma_damp) + g;
 			
 		}
 

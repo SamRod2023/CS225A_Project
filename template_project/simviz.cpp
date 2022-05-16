@@ -69,7 +69,7 @@ bool fRobotLinkSelect = false;
 
 Vector3d Delta = Vector3d(0.0, 0.0, 0.01);
 Vector3d object_final;
-Vector3d haptic_pos, haptic_force;
+Vector3d haptic_pos, haptic_force, haptic_vel;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -315,6 +315,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	redis_client.addEigenToReadCallback(0, JOINT_TORQUES_COMMANDED_KEY, command_torques);
 	redis_client.addEigenToReadCallback(0, HAPTIC_POS_KEY, haptic_pos);
 	redis_client.addEigenToWriteCallback(0, HAPTIC_FORCE_KEY, haptic_force);
+	redis_client.addEigenToReadCallback(0, HAPTIC_VEL_KEY, haptic_vel);
 
 	// add to write callback
 	redis_client.addEigenToWriteCallback(0, JOINT_ANGLES_KEY, robot->_q);
@@ -368,7 +369,12 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			//sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
 			//object_pos[i](2) = 0;
 			//object_pos[i] = object_pos[i]*10;
-			haptic_force = -haptic_pos;
+			haptic_force = -200*haptic_pos - haptic_vel;
+			/*if (haptic_pos(0) < -0.0075) {
+				haptic_force(0) = 10;
+			} else if (haptic_pos(0) > 0.0075) {
+				haptic_force(0) = -10;
+			}*/
 
 			Matrix3d R;
 			R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
@@ -376,6 +382,22 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			haptic_pos(2) = 0;
 			//haptic_pos = haptic_pos*10;
 			object_pos[i] = object_pos[i] + haptic_pos*0.02;
+			if (sqrt((object_pos[i](0))*(object_pos[i](0)) + (object_pos[i](1))*(object_pos[i](1))) < 0.2) {
+				double theta = atan2(object_pos[i](1),object_pos[i](0));
+				object_pos[i](0) = 0.2 * cos(theta);
+				object_pos[i](1) = 0.2 * sin(theta);
+			}
+
+			if (sqrt((object_pos[i](0))*(object_pos[i](0)) + (object_pos[i](1))*(object_pos[i](1))) > 0.875) {
+				double theta = atan2(object_pos[i](1),object_pos[i](0));
+				object_pos[i](0) = 0.875 * cos(theta);
+				object_pos[i](1) = 0.875 * sin(theta);
+
+				haptic_force(1) = -30 * cos(theta);
+				haptic_force(2) = -30 * sin(theta);
+			}
+			
+
 			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
 		}

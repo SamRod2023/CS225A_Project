@@ -34,7 +34,8 @@ const string world_file = "./resources/world.urdf";
 enum State 
 {
 	POSTURE = 0, 
-	MOTION
+	MOTION,
+	CAUGHT
 };
 
 // helper function 
@@ -120,18 +121,21 @@ int main() {
 	joint_task->_kp = 100.0;
 	joint_task->_kv = 20.0;
 
-	VectorXd q_init_desired(dof);
-	q_init_desired << -30.0, -15.0, -15.0, -105.0, 0.0, 90.0, 45.0, 0.02*180/M_PI, -0.02*180/M_PI;
+	VectorXd q_init_desired(dof), q_desired(dof);
+	q_init_desired << -30.0, 15.0, -15.0, -135.0, 0.0, 160.0, 45.0, 0.02*180/M_PI, -0.02*180/M_PI;
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
 
 	// containers
 	Vector3d ee_pos;
 	Matrix3d ee_rot;
+	string caught_status = "0";
 
 	// setup redis callback
 	redis_client.createReadCallback(0);
 	redis_client.createWriteCallback(0);
+
+	redis_client.set(CAUGHT_KEY, "0"); 
 
 	// add to read callback
 	redis_client.addEigenToReadCallback(0, JOINT_ANGLES_KEY, robot->_q);
@@ -141,6 +145,7 @@ int main() {
 	// add to write callback
 	redis_client.addStringToWriteCallback(0, CONTROLLER_RUNNING_KEY, controller_status);
 	redis_client.addEigenToWriteCallback(0, JOINT_TORQUES_COMMANDED_KEY, command_torques);
+	redis_client.addStringToWriteCallback(0, CAUGHT_KEY, caught_status);
 
 	// create a timer
 	LoopTimer timer;
@@ -200,7 +205,7 @@ int main() {
 			joint_task->computeTorques(joint_task_torques);
 			command_torques = posori_task_torques + joint_task_torques;
 			*/
-			Vector3d x, x_d, dx_d, dx, F;
+			Vector3d x, x_d, dx_d, dx, F, objectPosOld, caught_threshold, caught_delta;
 			VectorXd g(dof), joint_task_torque(dof), q_low(dof), q_high(dof), Gamma_mid(dof), Gamma_damp(dof);
 			MatrixXd Gamma_Neutralizer = MatrixXd::Identity(dof,dof);
 			Gamma_Neutralizer(0,0) = 0.0;
@@ -210,7 +215,7 @@ int main() {
 			double kpj = 100;
 			double kvj = 30;
 
-			double Vmax = 0.75;
+			double Vmax = 0.75; // Previously 0.75;
 			
 			robot->position(x, ee_link_name, pos_in_ee_link);
 			robot->linearVelocity(dx, ee_link_name, pos_in_ee_link);
@@ -235,13 +240,19 @@ int main() {
 			q_high(4) = 2.8973;
 			q_high(5) = 3.7525;
 			q_high(6) = 2.8973;
-			q_high(7) = 0.04;
-			q_high(8) = 0.04;
+			q_high(7) = 0.02;
+			q_high(8) = 0.02;
 
 			
-			x_d << _object_pos;
-			x_d(2) = 0.05;
+			//x_d << _object_pos; // No anticipation or interception
+			double interceptionScaling = 10;
+			x_d << _object_pos + interceptionScaling*(_object_pos - objectPosOld);
+
+			//cout << "\nInterception\n" << interceptionScaling*(_object_pos - objectPosOld) << endl;
+
+			x_d(2) = 0.15; // Mouse target position for z-direction
 			//cout << "Position: " << _object_pos << endl;
+			//cout << "\nDesired Position\n" << x_d << endl;
 
 			dx_d = kp / kv * (x_d - x);
 			double nu = sat(Vmax / dx_d.norm());
@@ -253,15 +264,35 @@ int main() {
 			Gamma_mid = -2 * kpj * (robot->_q - (q_high + q_low) / 2);
 			Gamma_mid = Gamma_Neutralizer * Gamma_mid;
 
-			VectorXd q_desired = q_init_desired;
+			q_desired = q_init_desired;
 			//q_desired << 0, 0, 0, 0, 0, 0, 0, 0, 0;
 
 			//joint_task_torque = -kpj*(robot->_q - q_desired) - kvj * robot->_dq;
 
 			robot->gravityVector(g);
 
-			command_torques = Jv.transpose() * F + (N.transpose() * Gamma_mid + N.transpose() * Gamma_damp) + g;
+			command_torques = Jv.transpose()*F + N.transpose()*((Gamma_mid + Gamma_damp));
+
+			if (counter % 100 == 0)
+			{
+				objectPosOld = _object_pos;
+			}
+
+			caught_threshold << 0.02, 0.02, 0.15;
+			caught_delta = x - _object_pos;
+			caught_delta = caught_delta.array().abs();
+
+			if (caught_delta(0) <= caught_threshold(0) && caught_delta(1) <= caught_threshold(1) && caught_delta(2) <= caught_threshold(2))
+			{
+				state = CAUGHT;
+				q_desired << robot->_q;
+				caught_status = "1"; 
+			}
 			
+		} else if (state == CAUGHT) {
+			double kp = 200;
+			double kv = 20;
+			command_torques = robot->_M*(-kp*(robot->_q - q_desired) - kv*robot->_dq);
 		}
 
 		// execute redis write callback

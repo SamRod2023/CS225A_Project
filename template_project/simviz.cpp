@@ -31,6 +31,7 @@ const string camera_name = "camera_fixed";
 const string camera_2 = "camera_2";
 const string base_link_name = "link0";
 const string ee_link_name = "link7";
+string caught_status = "0";
 
 // dynamic objects information
 const vector<string> object_names = {"cup"};
@@ -174,6 +175,7 @@ int main() {
 
 	// init redis client values 
 	redis_client.set(CONTROLLER_RUNNING_KEY, "0");  
+	redis_client.set(CAUGHT_KEY, "0");  
 	redis_client.setEigenMatrixJSON(JOINT_ANGLES_KEY, robot->_q); 
 	redis_client.setEigenMatrixJSON(JOINT_VELOCITIES_KEY, robot->_dq); 
 
@@ -206,16 +208,25 @@ int main() {
 		glfwGetFramebufferSize(window_2, &width_2, &height_2);
 
 		graphics->updateGraphics(robot_name, robot); 
-		for (int i = 0; i < n_objects; ++i) {
-			//object_pos.push_back(object_pos[i] + Delta);
-			//Matrix3d R;
-			//R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
-			//object_pos[i] = R*object_pos[i];
-			//object_pos[i](2) = 0;
-			//object_pos[i] = object_pos[i]*10;
-			//sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
-			graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
-			//cout << "Velocity: " << object_lin_vel[i] << endl;
+		if (caught_status == "0")
+		{
+			for (int i = 0; i < n_objects; ++i) {
+				//object_pos.push_back(object_pos[i] + Delta);
+				//Matrix3d R;
+				//R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
+				//object_pos[i] = R*object_pos[i];
+				//object_pos[i](2) = 0;
+				//object_pos[i] = object_pos[i]*10;
+				//sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
+				//Vector3d _object_pos, _object_lin_vel, _object_ang_vel;
+				//sim->getObjectVelocity(object_names[i], _object_lin_vel, _object_ang_vel);
+				graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
+				//cout << "Velocity: " << _object_lin_vel << endl;
+			}
+		} 
+		else
+		{
+
 		}
 
 		object_final = object_pos[0]; //Update key to send to controller
@@ -352,6 +363,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	redis_client.addEigenToReadCallback(0, HAPTIC_POS_KEY, haptic_pos);
 	redis_client.addEigenToWriteCallback(0, HAPTIC_FORCE_KEY, haptic_force);
 	redis_client.addEigenToReadCallback(0, HAPTIC_VEL_KEY, haptic_vel);
+	redis_client.addStringToReadCallback(0, CAUGHT_KEY, caught_status);
 
 	// add to write callback
 	redis_client.addEigenToWriteCallback(0, JOINT_ANGLES_KEY, robot->_q);
@@ -369,7 +381,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 
 	// start simulation 
 	fSimulationRunning = true;	
-	object_pos[0](2) = 0;
+	object_pos[0](2) = 0.15;
 
 	double rold = 0;
 

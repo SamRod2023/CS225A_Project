@@ -71,9 +71,10 @@
       	</inertial>
 
 	    <visual>
-	        <origin xyz="0 0 0.125" rpy="1.57 0 0" />
+	        <origin xyz="0 0 0" rpy="1.57 0 0" />
 			<geometry>
-	            <mesh filename="../../model/test_objects/meshes/visual/mouse_by_dommk.obj" scale = "0.05 0.05 0.05"/>
+	            <!-- <mesh filename="../../model/test_objects/meshes/visual/mouse_by_dommk.obj" scale = "0.05 0.05 0.05"/> -->
+	            <mesh filename="../../model/cs225a_final_project_files/meshes/visual/mouse.obj" scale = "0.05 0.05 0.05"/>
 	        </geometry>
 	    </visual>
 

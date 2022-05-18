@@ -223,6 +223,8 @@ int main() {
 			robot->taskInertiaMatrix(Lambda, Jv);
 			robot->nullspaceMatrix(N, Jv);
 
+
+
 			q_low(0) = -2.8973;
 			q_low(1) = -1.7628;
 			q_low(2) = -2.8973;
@@ -231,7 +233,7 @@ int main() {
 			q_low(5) = -0.0175;
 			q_low(6) = -2.8973;
 			q_low(7) = 0.0;
-			q_low(8) = 0.0;
+			q_low(8) = -0.04;
 			// set q_high
 			q_high(0) = 2.8973;
 			q_high(1) = 1.7628;
@@ -240,19 +242,22 @@ int main() {
 			q_high(4) = 2.8973;
 			q_high(5) = 3.7525;
 			q_high(6) = 2.8973;
-			q_high(7) = 0.02;
-			q_high(8) = 0.02;
+			q_high(7) = 0.04;
+			q_high(8) = 0.00;
 
 			
 			//x_d << _object_pos; // No anticipation or interception
 			double interceptionScaling = 10;
 			x_d << _object_pos + interceptionScaling*(_object_pos - objectPosOld);
+			x_d << -0.5, -0.5, 0.15;
 
-			//cout << "\nInterception\n" << interceptionScaling*(_object_pos - objectPosOld) << endl;
+			
 
 			x_d(2) = 0.15; // Mouse target position for z-direction
-			//cout << "Position: " << _object_pos << endl;
+			cout << "\nMouse\n" << _object_pos << endl;
 			//cout << "\nDesired Position\n" << x_d << endl;
+			cout << "\nX-pos\n" << x << endl;
+			cout << "\nDesired Position\n" << x_d << endl;
 
 			dx_d = kp / kv * (x_d - x);
 			double nu = sat(Vmax / dx_d.norm());
@@ -286,6 +291,10 @@ int main() {
 			{
 				state = CAUGHT;
 				q_desired << robot->_q;
+				q_desired(7) = 0.01;
+				q_desired(8) = -0.01;
+				
+				
 				caught_status = "1"; 
 			}
 			

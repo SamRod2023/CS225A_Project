@@ -420,7 +420,12 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			//sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
 			//object_pos[i](2) = 0;
 			//object_pos[i] = object_pos[i]*10;
-			haptic_force = -400*haptic_pos - haptic_vel;
+			if (caught_status == "0"){
+				haptic_force = -400*haptic_pos - haptic_vel;
+			}
+			else {
+				haptic_force = -3000*haptic_pos - 30*haptic_vel;
+			}
 			/*if (haptic_pos(0) < -0.0075) {
 				haptic_force(0) = 10;
 			} else if (haptic_pos(0) > 0.0075) {

@@ -28,6 +28,7 @@ const string world_file = "./resources/world.urdf";
 const string robot_file = "./resources/panda_arm.urdf";
 const string robot_name = "panda";
 const string camera_name = "camera_fixed";
+const string camera_2 = "camera_2";
 const string base_link_name = "link0";
 const string ee_link_name = "link7";
 
@@ -91,6 +92,10 @@ int main() {
 	//graphics->showLinkFrame(true, robot_name, ee_link_name, 0.15);  // can add frames for different links
 	graphics->getCamera(camera_name)->setClippingPlanes(0.1, 50);  // set the near and far clipping planes 
 
+	Eigen::Vector3d camera_2_pos, camera_2_lookat, camera_2_vertical;
+	graphics->getCameraPose(camera_2, camera_2_pos, camera_2_vertical, camera_2_lookat);
+	graphics->getCamera(camera_2)->setClippingPlanes(0.1, 50);  // set the near and far clipping planes 
+
 	// load robots
 	auto robot = new Sai2Model::Sai2Model(robot_file, false);
 	robot->updateKinematics();
@@ -140,17 +145,24 @@ int main() {
 	// information about computer screen and GLUT display window
 	int screenW = mode->width;
 	int screenH = mode->height;
-	int windowW = 0.8 * screenW;
-	int windowH = 0.8 * screenH;
+	int windowW = 0.9 * screenW;
+	int windowH = 0.9 * screenH;
 	int windowPosY = (screenH - windowH) / 2;
 	int windowPosX = windowPosY;
 
 	// create window and make it current
 	glfwWindowHint(GLFW_VISIBLE, 0);
-	GLFWwindow* window = glfwCreateWindow(windowW, windowH, "Panda Starter Code", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(windowW, windowH, "Camera 1: Top Down", NULL, NULL);
 	glfwSetWindowPos(window, windowPosX, windowPosY);
 	glfwShowWindow(window);
 	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
+
+	glfwWindowHint(GLFW_VISIBLE, 0);
+	GLFWwindow* window_2 = glfwCreateWindow(windowW /3, windowH /3, "Camera 2", NULL, NULL);
+	glfwSetWindowPos(window_2, windowPosX + 3*windowW / 4, windowPosY);
+	glfwShowWindow(window_2);
+	glfwMakeContextCurrent(window_2);
 	glfwSwapInterval(1);
 
 	// set callbacks
@@ -189,6 +201,10 @@ int main() {
 		// update graphics. this automatically waits for the correct amount of time
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
+
+		int width_2, height_2;
+		glfwGetFramebufferSize(window_2, &width_2, &height_2);
+
 		graphics->updateGraphics(robot_name, robot); 
 		for (int i = 0; i < n_objects; ++i) {
 			//object_pos.push_back(object_pos[i] + Delta);
@@ -204,11 +220,16 @@ int main() {
 
 		object_final = object_pos[0]; //Update key to send to controller
 		
-		
+		glfwMakeContextCurrent(window);
 		graphics->render(camera_name, width, height);
+		glfwMakeContextCurrent(window_2);
+		graphics->render(camera_2, width_2, height_2);
 
 		// swap buffers
+		glfwMakeContextCurrent(window);
 		glfwSwapBuffers(window);
+		glfwMakeContextCurrent(window_2);
+		glfwSwapBuffers(window_2);
 
 		// wait until all GL commands are completed
 		glFinish();
@@ -235,6 +256,18 @@ int main() {
 		cam_roll_axis.normalize();
 		Eigen::Vector3d cam_lookat_axis = camera_lookat;
 		cam_lookat_axis.normalize();
+
+		Eigen::Vector3d cam_depth_axis_2;
+		cam_depth_axis_2 = camera_2_lookat - camera_2_pos;
+		cam_depth_axis_2.normalize();
+		Eigen::Vector3d cam_up_axis_2;
+		// cam_up_axis = camera_vertical;
+		// cam_up_axis.normalize();
+		cam_up_axis_2 << 0.0, 0.0, 1.0; //TODO: there might be a better way to do this
+		Eigen::Vector3d cam_roll_axis_2 = (camera_2_lookat - camera_2_pos).cross(cam_up_axis_2);
+		cam_roll_axis_2.normalize();
+		Eigen::Vector3d cam_lookat_axis_2 = camera_2_lookat;
+		cam_lookat_axis_2.normalize();
 
 		if (fTransXp) {
 			camera_pos = camera_pos + 0.05*cam_roll_axis;
@@ -277,6 +310,8 @@ int main() {
 		}
 		graphics->setCameraPose(camera_name, camera_pos, cam_up_axis, camera_lookat);
 		glfwGetCursorPos(window, &last_cursorx, &last_cursory);
+
+		graphics->setCameraPose(camera_2, camera_2_pos, cam_up_axis_2, camera_2_lookat);
 		
 		count++;
 	}
@@ -287,6 +322,7 @@ int main() {
 
 	// destroy context
 	glfwDestroyWindow(window);
+	glfwDestroyWindow(window_2);
 
 	// terminate
 	glfwTerminate();
@@ -334,6 +370,9 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	// start simulation 
 	fSimulationRunning = true;	
 	object_pos[0](2) = 0;
+
+	double rold = 0;
+
 	while (fSimulationRunning) {
 		fTimerDidSleep = timer.waitForNextLoop();
 
@@ -369,7 +408,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			//sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
 			//object_pos[i](2) = 0;
 			//object_pos[i] = object_pos[i]*10;
-			haptic_force = -200*haptic_pos - haptic_vel;
+			haptic_force = -400*haptic_pos - haptic_vel;
 			/*if (haptic_pos(0) < -0.0075) {
 				haptic_force(0) = 10;
 			} else if (haptic_pos(0) > 0.0075) {
@@ -381,22 +420,40 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			haptic_pos = R*haptic_pos;
 			haptic_pos(2) = 0;
 			//haptic_pos = haptic_pos*10;
+
+			double r = sqrt((object_pos[i](0))*(object_pos[i](0)) + (object_pos[i](1))*(object_pos[i](1)));
+
 			object_pos[i] = object_pos[i] + haptic_pos*0.02;
-			if (sqrt((object_pos[i](0))*(object_pos[i](0)) + (object_pos[i](1))*(object_pos[i](1))) < 0.2) {
+			//inner
+			if ( r < 0.2) {
 				double theta = atan2(object_pos[i](1),object_pos[i](0));
 				object_pos[i](0) = 0.2 * cos(theta);
 				object_pos[i](1) = 0.2 * sin(theta);
 			}
-
-			if (sqrt((object_pos[i](0))*(object_pos[i](0)) + (object_pos[i](1))*(object_pos[i](1))) > 0.875) {
+			//outer
+			if (r > 0.875) {
 				double theta = atan2(object_pos[i](1),object_pos[i](0));
 				object_pos[i](0) = 0.875 * cos(theta);
 				object_pos[i](1) = 0.875 * sin(theta);
-
-				haptic_force(1) = -30 * cos(theta);
-				haptic_force(2) = -30 * sin(theta);
 			}
-			
+			//outer haptics
+			if (r > 0.873) {
+				double theta = atan2(object_pos[i](1),object_pos[i](0));
+				double mag = r - 0.873;
+
+				haptic_force(1) = haptic_force(1) - 5500*mag * cos(theta);
+				haptic_force(2) = haptic_force(2) - 5500*mag * sin(theta);
+			}
+
+			if (r < 0.202) {
+				double theta = atan2(object_pos[i](1),object_pos[i](0));
+				double mag = r - 0.202;
+
+				haptic_force(1) = haptic_force(1) - 5500*mag * cos(theta);
+				haptic_force(2) = haptic_force(2) - 5500*mag * sin(theta);
+			}
+
+			rold = r;
 
 			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);

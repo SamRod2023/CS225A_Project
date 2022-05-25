@@ -210,7 +210,7 @@ int main() {
 			MatrixXd Gamma_Neutralizer = MatrixXd::Identity(dof,dof);
 			Gamma_Neutralizer(0,0) = 0.0;
 
-			double kp = 200;
+			double kp = 400;
 			double kv = 20;
 			double kpj = 100;
 			double kvj = 30;
@@ -249,7 +249,7 @@ int main() {
 			//x_d << _object_pos; // No anticipation or interception
 			double interceptionScaling = 10;
 			x_d << _object_pos + interceptionScaling*(_object_pos - objectPosOld);
-			x_d << -0.5, -0.5, 0.15;
+			//x_d << -0.32, -0.49, 0.15;
 
 			
 
@@ -275,7 +275,7 @@ int main() {
 			//joint_task_torque = -kpj*(robot->_q - q_desired) - kvj * robot->_dq;
 
 			robot->gravityVector(g);
-
+			
 			command_torques = Jv.transpose()*F + N.transpose()*((Gamma_mid + Gamma_damp));
 
 			if (counter % 100 == 0)

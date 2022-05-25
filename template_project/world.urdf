@@ -15,7 +15,7 @@
 				<box size="5 5 0.0127" />
 	        </geometry>
 	        <material name="material">
-		        <color rgba="0.1 128 0.1 1.0" />
+		        <color rgba="0.337 0.49 0.275 1.0" />
 	        </material>
 	    </visual>
 	    <visual>
@@ -24,7 +24,7 @@
 				<cylinder length="0.0128" radius="0.875"/>
 	        </geometry>
 	        <material name="material">
-		        <color rgba="0.1 128 0.1 1.0" />
+		        <color rgba="0.337 0.49 0.275 1.0" />
 	        </material>
 	    </visual>
 	    <visual>
@@ -42,7 +42,7 @@
 				<cylinder length="0.0129" radius="0.2"/>
 	        </geometry>
 	        <material name="material">
-		        <color rgba="0.1 128 0.1 1.0" />
+		        <color rgba="0.337 0.49 0.275 1.0" />
 	        </material>
 	    </visual>
 	    <visual>

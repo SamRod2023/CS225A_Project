@@ -31,6 +31,7 @@ const string camera_name = "camera_fixed";
 const string camera_2 = "camera_2";
 const string base_link_name = "link0";
 const string ee_link_name = "link7";
+const Vector3d pos_in_ee_link = Vector3d(0, 0, 0.2);
 string caught_status = "0";
 
 // dynamic objects information
@@ -72,6 +73,11 @@ bool fRobotLinkSelect = false;
 Vector3d Delta = Vector3d(0.0, 0.0, 0.01);
 Vector3d object_final;
 Vector3d haptic_pos, haptic_force, haptic_vel;
+Vector3d x;
+int score;
+int lower = 0;
+double theta_robot;
+double theta_mouse;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -374,7 +380,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	// create a timer
 	LoopTimer timer;
 	timer.initializeTimer();
-	timer.setLoopFrequency(1000); 
+	timer.setLoopFrequency(1000);
 	bool fTimerDidSleep = true;
 	double start_time = timer.elapsedTime();
 	double last_time = start_time;
@@ -396,7 +402,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 
 		// set joint torques
 		if (controller_status == "1") {
-			sim->setJointTorques(robot_name, command_torques + g);
+			sim->setJointTorques(robot_name, command_torques+ g);
 		} else {
 			sim->setJointTorques(robot_name, g - robot->_M * (kv * robot->_dq));
 		}
@@ -439,7 +445,12 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			//haptic_pos = haptic_pos*10;
 
 			double r = sqrt((object_pos[i](0))*(object_pos[i](0)) + (object_pos[i](1))*(object_pos[i](1)));
-
+			//Accounts for drift of haptic device
+			if (abs(haptic_pos(0)) < 0.002 && abs(haptic_pos(1)) < 0.0015){
+				haptic_pos(0) = 0;
+				haptic_pos(1) = 0;
+			}
+			
 			object_pos[i] = object_pos[i] + haptic_pos*0.02;
 			//inner
 			if ( r < 0.2) {
@@ -453,7 +464,6 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 				object_pos[i](0) = 0.875 * cos(theta);
 				object_pos[i](1) = 0.875 * sin(theta);
 			}
-			//outer haptics
 			if (r > 0.873) {
 				double theta = atan2(object_pos[i](1),object_pos[i](0));
 				double mag = r - 0.873;
@@ -469,12 +479,44 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 				haptic_force(1) = haptic_force(1) - 5500*mag * cos(theta);
 				haptic_force(2) = haptic_force(2) - 5500*mag * sin(theta);
 			}
-
+			
 			rold = r;
 
 			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
 		}
+		
+		Vector3d mouse_pos = Vector3d(0.0, 0.0, 0.0);
+		
+		//Score tracking
+		robot->position(x, ee_link_name, pos_in_ee_link);
+
+		theta_robot = atan2(x(1),x(0));
+		mouse_pos(0) = object_pos[0](0)*cos(theta_robot)+object_pos[0](1)*sin(theta_robot);
+		mouse_pos(1) = -object_pos[0](0)*sin(theta_robot)+object_pos[0](1)*cos(theta_robot);
+		theta_mouse = atan2(mouse_pos(1),mouse_pos(0));
+		
+		if (theta_mouse > 0 && lower == 1 && mouse_pos(0) > 0){
+			score += 1;
+			lower = 0;
+		}
+		else if (theta_mouse < 0 && lower == 0 && mouse_pos(0) > 0){
+			score += 1;
+			lower = 1;
+		}
+		
+		if (theta_mouse > 0){
+			lower = 0;
+		}
+		else if (theta_mouse < 0){
+			lower = 1;
+		}
+		
+		cout << "\nScore:\n" << score << endl;
+		cout << "\nPos:\n" << theta_mouse << endl;
+		
+	
+		
 
 		// execute redis write callback
 		redis_client.executeWriteCallback(0);		

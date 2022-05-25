@@ -12,7 +12,7 @@ newmtl Material__25
 	Kd 0.5880 0.5880 0.5880
 	Ks 0.0000 0.0000 0.0000
 	Ke 0.0000 0.0000 0.0000
-	map_Kd C:\Users\Dominic\Desktop\mouse_by_dommk\textures\mouse_by_dommk_Base_Color.png
+	map_Kd mouse_by_dommk_Base_Color.png
 
 newmtl Material__26
 	Ns 10.0000
@@ -25,5 +25,5 @@ newmtl Material__26
 	Kd 0.5880 0.5880 0.5880
 	Ks 0.0000 0.0000 0.0000
 	Ke 0.0000 0.0000 0.0000
-	map_Ka C:\Users\Dominic\Desktop\mouse_by_dommk\textures\Group58359_Base_Color.png
-	map_Kd C:\Users\Dominic\Desktop\mouse_by_dommk\textures\Group58359_Base_Color.png
+	map_Ka Group58359_Base_Color.png
+	map_Kd Group58359_Base_Color.png

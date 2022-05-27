@@ -13,6 +13,7 @@
 #include "timer/LoopTimer.h"
 #include <GLFW/glfw3.h>  // must be loaded after loading opengl/glew
 #include <signal.h>
+#include "chai3d.h"
 
 bool fSimulationRunning = false;
 void sighandler(int){fSimulationRunning = false;}
@@ -22,6 +23,7 @@ void sighandler(int){fSimulationRunning = false;}
 
 using namespace std;
 using namespace Eigen;
+using namespace chai3d;
 
 // specify urdf and robots 
 const string world_file = "./resources/world.urdf";
@@ -70,14 +72,19 @@ bool fTransZn = false;
 bool fRotPanTilt = false;
 bool fRobotLinkSelect = false;
 
+//Added Variables
 Vector3d Delta = Vector3d(0.0, 0.0, 0.01);
 Vector3d object_final;
 Vector3d haptic_pos, haptic_force, haptic_vel;
 Vector3d x;
+Vector3d dx;
 int score;
-int lower = 0;
+int lower = 0; //Scoring previous position tracker
 double theta_robot;
 double theta_mouse;
+
+cFontPtr font;
+cLabel* labelDescription;
 
 int main() {
 	cout << "Loading URDF world model file: " << world_file << endl;
@@ -156,6 +163,15 @@ int main() {
 	int windowH = 0.9 * screenH;
 	int windowPosY = (screenH - windowH) / 2;
 	int windowPosX = windowPosY;
+	
+	//Create Text for score
+	font = NEW_CFONTCALIBRI20();
+	labelDescription = new cLabel(font);
+	graphics->getCamera(camera_name)->m_frontLayer->addChild(labelDescription);
+	labelDescription->setText("Score: Broken :(");
+	labelDescription->m_fontColor.setWhite();
+	labelDescription->setLocalPos(50, 0);// windowH + 600);
+	labelDescription->setFontScale(8);
 
 	// create window and make it current
 	glfwWindowHint(GLFW_VISIBLE, 0);
@@ -199,12 +215,6 @@ int main() {
 
 	while (!glfwWindowShouldClose(window) && fSimulationRunning)
 	{
-		// add sphere for every nth count
-		//if (count % 60 == 0) {  // default refresh rate 
-		//	addSphere(graphics, "test", start_pos, Quaterniond(1, 0, 0, 0), 0.01, Vector4d(1, 1, 1, 1));
-		//	addBox(graphics, "test", start_pos + Vector3d(-2, 0, 0), Quaterniond(1, 0, 0, 0), Vector3d(0.05, 0.05, 0.05), Vector4d(1, 1, 1, 1));
-		//	start_pos(1) += 1e-1;
-		//}
 
 		// update graphics. this automatically waits for the correct amount of time
 		int width, height;
@@ -214,25 +224,19 @@ int main() {
 		glfwGetFramebufferSize(window_2, &width_2, &height_2);
 
 		graphics->updateGraphics(robot_name, robot); 
-		if (caught_status == "0")
+		if (caught_status == "0") //Catching(MOTION) state
 		{
 			for (int i = 0; i < n_objects; ++i) {
-				//object_pos.push_back(object_pos[i] + Delta);
-				//Matrix3d R;
-				//R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
-				//object_pos[i] = R*object_pos[i];
-				//object_pos[i](2) = 0;
-				//object_pos[i] = object_pos[i]*10;
-				//sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
-				//Vector3d _object_pos, _object_lin_vel, _object_ang_vel;
-				//sim->getObjectVelocity(object_names[i], _object_lin_vel, _object_ang_vel);
 				graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
-				//cout << "Velocity: " << _object_lin_vel << endl;
 			}
 		} 
-		else
+		else if (caught_status == "2") //DRAG state
 		{
-
+			robot->position(x, ee_link_name, pos_in_ee_link);
+			//Object position = end effector position in x & y
+			object_pos[0](0) = x(0);
+			object_pos[0](1) = x(1);
+			graphics->updateObjectGraphics(object_names[0], object_pos[0], object_ori[0]);
 		}
 
 		object_final = object_pos[0]; //Update key to send to controller
@@ -386,10 +390,9 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	double last_time = start_time;
 
 	// start simulation 
-	fSimulationRunning = true;	
+	fSimulationRunning = true;
+	//Mouse z-position stays constant	
 	object_pos[0](2) = 0.15;
-
-	double rold = 0;
 
 	while (fSimulationRunning) {
 		fTimerDidSleep = timer.waitForNextLoop();
@@ -422,21 +425,21 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 		
 		// get dynamic object positions
 		for (int i = 0; i < n_objects; ++i) {
-			//sim->getObjectPosition(object_names[i], object_pos[i], object_ori[i]);
-			//sim->getObjectVelocity(object_names[i], object_lin_vel[i], object_ang_vel[i]);
-			//object_pos[i](2) = 0;
-			//object_pos[i] = object_pos[i]*10;
+
 			if (caught_status == "0"){
 				haptic_force = -400*haptic_pos - haptic_vel;
 			}
-			else {
+			else if (caught_status == "1") {
 				haptic_force = -3000*haptic_pos - 30*haptic_vel;
 			}
-			/*if (haptic_pos(0) < -0.0075) {
-				haptic_force(0) = 10;
-			} else if (haptic_pos(0) > 0.0075) {
-				haptic_force(0) = -10;
-			}*/
+			else if (caught_status == "2") {
+				robot->linearVelocity(dx, ee_link_name, pos_in_ee_link);
+
+				haptic_force(0) = 0;
+				haptic_force(1) = 10*dx(0);
+				haptic_force(2) = 10*dx(1);
+				
+			}
 
 			Matrix3d R;
 			R << 0, 1, 0, 0, 0, 1, 1, 0, 0;
@@ -480,7 +483,7 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 				haptic_force(2) = haptic_force(2) - 5500*mag * sin(theta);
 			}
 			
-			rold = r;
+			//rold = r;
 
 			sim->setObjectPosition(object_names[i], object_pos[i], object_ori[i]);
 			//graphics->updateObjectGraphics(object_names[i], object_pos[i], object_ori[i]);
@@ -490,21 +493,21 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 		
 		//Score tracking
 		robot->position(x, ee_link_name, pos_in_ee_link);
-
 		theta_robot = atan2(x(1),x(0));
+		//Rotate mouse position into a moving frame aligned with the endeffector
 		mouse_pos(0) = object_pos[0](0)*cos(theta_robot)+object_pos[0](1)*sin(theta_robot);
 		mouse_pos(1) = -object_pos[0](0)*sin(theta_robot)+object_pos[0](1)*cos(theta_robot);
 		theta_mouse = atan2(mouse_pos(1),mouse_pos(0));
-		
-		if (theta_mouse > 0 && lower == 1 && mouse_pos(0) > 0){
+		//Check if mouse crossed the robot path
+		if (theta_mouse > 0 && lower == 1 && mouse_pos(0) > 0 && caught_status == "0" && controller_status == "1"){
 			score += 1;
 			lower = 0;
 		}
-		else if (theta_mouse < 0 && lower == 0 && mouse_pos(0) > 0){
+		else if (theta_mouse < 0 && lower == 0 && mouse_pos(0) > 0 && caught_status == "0" && controller_status == "1"){
 			score += 1;
 			lower = 1;
 		}
-		
+		//Set lower indicator to correct value based on mouse position
 		if (theta_mouse > 0){
 			lower = 0;
 		}
@@ -512,11 +515,9 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 			lower = 1;
 		}
 		
-		cout << "\nScore:\n" << score << endl;
-		cout << "\nPos:\n" << theta_mouse << endl;
-		
-	
-		
+		//cout << "\nScore:\n" << score << endl;
+		//cout << "\nPos:\n" << theta_mouse << endl;
+		labelDescription->setText("Score: " + to_string(score));
 
 		// execute redis write callback
 		redis_client.executeWriteCallback(0);		
@@ -526,6 +527,8 @@ void simulation(Sai2Model::Sai2Model* robot, Simulation::Sai2Simulation* sim)
 	}
 
 	double end_time = timer.elapsedTime();
+	haptic_force << 0, 0, 0;
+	redis_client.executeWriteCallback(0);		
 	std::cout << "\n";
 	std::cout << "Simulation Loop run time  : " << end_time << " seconds\n";
 	std::cout << "Simulation Loop updates   : " << timer.elapsedCycles() << "\n";

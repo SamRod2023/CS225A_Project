@@ -24,6 +24,7 @@ void sighandler(int){runloop = false;}
 
 
 #define RAD(deg) ((double)(deg) * M_PI / 180.0)
+#define PI 3.14159265
 
 #include "redis_keys.h"
 
@@ -35,7 +36,8 @@ enum State
 {
 	POSTURE = 0, 
 	MOTION,
-	CAUGHT
+	CAUGHT,
+	DRAG
 };
 
 // helper function 
@@ -125,6 +127,10 @@ int main() {
 	q_init_desired << -30.0, 15.0, -15.0, -135.0, 0.0, 160.0, 45.0, 0.02*180/M_PI, -0.02*180/M_PI;
 	q_init_desired *= M_PI/180.0;
 	joint_task->_desired_position = q_init_desired;
+	
+	//Drag state variables
+	double theta_robot;
+	double r;
 
 	// containers
 	Vector3d ee_pos;
@@ -152,6 +158,8 @@ int main() {
 	timer.initializeTimer();
 	timer.setLoopFrequency(1000); 
 	double start_time = timer.elapsedTime(); //secs
+	double caught_time = 0;
+	double drag_time;
 	bool fTimerDidSleep = true;
 
 	unsigned long long counter = 0;
@@ -254,10 +262,10 @@ int main() {
 			
 
 			x_d(2) = 0.15; // Mouse target position for z-direction
-			cout << "\nMouse\n" << _object_pos << endl;
+			//cout << "\nMouse\n" << _object_pos << endl;
 			//cout << "\nDesired Position\n" << x_d << endl;
-			cout << "\nX-pos\n" << x << endl;
-			cout << "\nDesired Position\n" << x_d << endl;
+			//cout << "\nX-pos\n" << x << endl;
+			//cout << "\nDesired Position\n" << x_d << endl;
 
 			dx_d = kp / kv * (x_d - x);
 			double nu = sat(Vmax / dx_d.norm());
@@ -290,6 +298,7 @@ int main() {
 			if (caught_delta(0) <= caught_threshold(0) && caught_delta(1) <= caught_threshold(1) && caught_delta(2) <= caught_threshold(2))
 			{
 				state = CAUGHT;
+				caught_time = time;
 				q_desired << robot->_q;
 				q_desired(7) = 0.01;
 				q_desired(8) = -0.01;
@@ -298,10 +307,86 @@ int main() {
 				caught_status = "1"; 
 			}
 			
-		} else if (state == CAUGHT) {
+		} 
+		else if (state == CAUGHT) {
+			Vector3d x;
 			double kp = 200;
 			double kv = 20;
 			command_torques = robot->_M*(-kp*(robot->_q - q_desired) - kv*robot->_dq);
+			if (time > caught_time+2){
+				robot->position(x, ee_link_name, pos_in_ee_link);
+				state = DRAG;
+				drag_time = time;
+				theta_robot = atan2(x(1),x(0)) - PI/2;
+				r = sqrt((x(0))*(x(0)) + (x(1))*(x(1)));
+				caught_status = "2"; 
+			}
+		}
+		else if (state == DRAG) {
+			Vector3d x, x_d, dx_d, ddx_d, dx, F, objectPosOld, caught_threshold, caught_delta;
+			VectorXd g(dof), joint_task_torque(dof), q_low(dof), q_high(dof), Gamma_mid(dof), Gamma_damp(dof);
+			MatrixXd Gamma_Neutralizer = MatrixXd::Identity(dof,dof);
+			Gamma_Neutralizer(0,0) = 0.0;
+
+			double kp = 400;
+			double kv = 20;
+			double kpj = 100;
+			double kvj = 30;
+
+			double Vmax = 0.75; // Previously 0.75;
+			
+			robot->position(x, ee_link_name, pos_in_ee_link);
+			robot->linearVelocity(dx, ee_link_name, pos_in_ee_link);
+			robot->Jv(Jv, ee_link_name, pos_in_ee_link);
+			robot->taskInertiaMatrix(Lambda, Jv);
+			robot->nullspaceMatrix(N, Jv);
+
+			double current_time = time - drag_time;
+
+			q_low(0) = -2.8973;
+			q_low(1) = -1.7628;
+			q_low(2) = -2.8973;
+			q_low(3) = -3.0718;
+			q_low(4) = -2.8973;
+			q_low(5) = -0.0175;
+			q_low(6) = -2.8973;
+			q_low(7) = 0.0;
+			q_low(8) = -0.04;
+			// set q_high
+			q_high(0) = 2.8973;
+			q_high(1) = 1.7628;
+			q_high(2) = 2.8973;
+			q_high(3) = -0.0698;
+			q_high(4) = 2.8973;
+			q_high(5) = 3.7525;
+			q_high(6) = 2.8973;
+			q_high(7) = 0.04;
+			q_high(8) = 0.00;
+			
+			if (r > 0.61){
+				r -= 0.0001;
+			}
+			else if (r < 0.59){
+				r += 0.0001;
+			}			
+			
+			
+			x_d << r*sin(PI*current_time/2-theta_robot), r*cos(PI*current_time/2-theta_robot), 0.15;
+
+			dx_d << r*PI*cos(PI*current_time/2-theta_robot)/2, -r*PI*sin(PI*current_time/2-theta_robot)/2, 0;
+
+			ddx_d << -r*PI*PI*sin(PI*current_time/2-theta_robot)/4, -r*PI*PI*cos(PI*current_time/2-theta_robot)/4, 0;
+
+			F = Lambda*(ddx_d -kp*(x - x_d) - kv*(dx - dx_d));
+
+			Gamma_damp = -kvj * robot->_dq;
+
+			Gamma_mid = -2 * kpj * (robot->_q - (q_high + q_low) / 2);
+			Gamma_mid = Gamma_Neutralizer * Gamma_mid;
+
+			q_desired = q_init_desired;
+			
+			command_torques = Jv.transpose()*F + N.transpose()*((Gamma_mid + Gamma_damp));
 		}
 
 		// execute redis write callback
